@@ -4,6 +4,9 @@ import re  # 用于正则表达式验证
 import jwt
 import secrets
 from flask_bcrypt import Bcrypt  # 用于密码哈希加密
+from email.mime.text import MIMEText  # 新增这行导入
+from email.header import Header
+import smtplib
 
 # --- 服务层 ---
 # 这些类包含“业务逻辑”（要做什么）
@@ -194,6 +197,12 @@ class AuthService:
         access_token_expire_minutes: int,
         refresh_token_expire_days: int,
         log_service,
+        # 新增：邮件配置参数
+        smtp_server: str,
+        smtp_port: int,
+        smtp_user: str,
+        smtp_password: str,
+        email_from: str,
     ):
         # 依赖注入：用户仓库、认证仓库、Bcrypt 实例，以及 JWT 相关配置
         self.user_repo = user_repo
@@ -204,6 +213,14 @@ class AuthService:
         self.access_token_expire_minutes = access_token_expire_minutes
         self.refresh_token_expire_days = refresh_token_expire_days
         self.log_service = log_service  # 初始化日志服务
+        
+        # 初始化邮件配置
+        self.smtp_server = smtp_server
+        self.smtp_port = smtp_port
+        self.smtp_user = smtp_user
+        self.smtp_password = smtp_password
+        self.email_from = email_from
+
 
     def login_user(self, username_or_email, password, ip_address, user_agent):
         """用户登录：验证用户名/邮箱 + 密码，返回 access_token 和 refresh_token"""
@@ -393,10 +410,58 @@ class AuthService:
             print(f"\n--- {username} 的密码重置请求 ---")
             print(f"使用此 token 重置密码: {token}")
             print(f"有效期至: {expires_at.isoformat()} UTC\n")
+            
 
+            # 发送密码重置邮件
+            self._send_reset_email(
+                to_email=email,
+                username=username,
+                token=token,
+                expires_at=expires_at
+            )
         # 即使用户不存在，也返回同样的提示（防止暴力猜邮箱）
         return {"message": "如果该邮箱存在，将会收到密码重置邮件"}
+    
+    def _send_reset_email(self, to_email: str, username: str, token, expires_at: datetime):
+        """发送密码重置邮件的内部方法"""
+        # 邮件主题
+        subject = "密码重置请求"
+        
+        # 邮件内容（HTML格式，更美观）
+        html_content = f"""
+        <html>
+          <body>
+            <h3>您好，{username}！</h3>
+            <p>我们收到了您的密码重置请求。您的密码重置令牌是：{token}：</p>
+            <p>令牌有效期为 1 小时,截止时间：{expires_at.astimezone(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')}（中国时间）</p>
+            <p>如果您没有请求重置密码，请忽略此邮件。</p>
+            <p>感谢使用我们的服务！</p>
+          </body>
+        </html>
+        """
+        
+        # 创建邮件消息对象
+        msg = MIMEText(html_content, "html", "utf-8")
+        msg["From"] = Header(self.email_from, "utf-8")  # 发件人
+        msg["To"] = Header(to_email, "utf-8")          # 收件人
+        msg["Subject"] = Header(subject, "utf-8")      # 主题
 
+        try:
+            # 连接SMTP服务器并发送邮件
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()  # 启用TLS加密
+                server.login(self.smtp_user, self.smtp_password)  # 登录邮箱
+                server.sendmail(
+                    self.smtp_user,
+                    to_email,
+                    msg.as_string()
+                )
+            print(f"密码重置邮件已发送至 {to_email}")
+        except Exception as e:
+            # 记录邮件发送失败的错误
+            print(f"邮件发送失败: {str(e)}")
+            # 可以选择抛出异常，让上层处理
+            raise RuntimeError(f"无法发送重置邮件: {str(e)}")
     def reset_password_with_token(self, token_plain: str, new_password: str):
         """用户通过 token 重置密码"""
         if not token_plain or not new_password:
@@ -441,6 +506,7 @@ class AuthService:
         self.auth_repo.delete_password_reset_token(valid_token_record["token_hash"])
 
         return {"message": "密码已成功重置"}
+    
 
 # --- 新增：日志服务类 ---
 class LogService:

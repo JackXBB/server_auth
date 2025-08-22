@@ -36,6 +36,13 @@ app.config["REFRESH_TOKEN_EXPIRE_DAYS"] = int(
     os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7)
 )  # Refresh Token 有效期为 7 天
 
+# 加载邮件配置
+app.config["SMTP_SERVER"] = os.getenv("SMTP_SERVER")
+app.config["SMTP_PORT"] = int(os.getenv("SMTP_PORT", 587))
+app.config["SMTP_USER"] = os.getenv("SMTP_USER")
+app.config["SMTP_PASSWORD"] = os.getenv("SMTP_PASSWORD")
+app.config["EMAIL_FROM"] = os.getenv("EMAIL_FROM")
+
 
 # 确保密钥已经设置
 if not app.config["SECRET_KEY"] or not app.config["JWT_SECRET_KEY"]:
@@ -58,7 +65,13 @@ auth_service = AuthService(
     app.config["JWT_ALGORITHM"],
     app.config["ACCESS_TOKEN_EXPIRE_MINUTES"],
     app.config["REFRESH_TOKEN_EXPIRE_DAYS"],
-    log_service  # 传入日志服务
+    log_service,  # 传入日志服务
+    # 新增邮件配置参数
+    smtp_server=app.config["SMTP_SERVER"],
+    smtp_port=app.config["SMTP_PORT"],
+    smtp_user=app.config["SMTP_USER"],
+    smtp_password=app.config["SMTP_PASSWORD"],
+    email_from=app.config["EMAIL_FROM"],
 )
 
 # --- API 接口定义 ---
