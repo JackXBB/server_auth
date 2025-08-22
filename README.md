@@ -48,7 +48,10 @@ API 层 (app.py)：处理 HTTP 请求，调用服务层，无业务逻辑或数�
 | PUT    | `/users/{user_id}/password` | 修改自身密码                     |
 | DELETE | `/users/{user_id}`          | **管理员专用**：禁用账户（软删除）        |
 
-
+命令行示例:
+curl -X POST http://localhost:5000/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token":"83AgInn_0_5VZZpFs-7jE7aSCNM3VAMC3P-XAcfhm6U","new_password":"abc123456"}'
 
 ## Acknowledgements
 本项目基于 [User-Management-API](https://github.com/m-arifin-ilham/User-Management-API) 开发。
