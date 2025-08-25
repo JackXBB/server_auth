@@ -352,7 +352,10 @@ class AuthService:
         """登出：撤销用户的 refresh_token"""
         if not refresh_token_plain:
             raise ValueError("登出需要提供刷新令牌 Refresh Token")
-
+            
+        user = self.user_repo.find_user_by_id(user_id)
+        if not user:
+            raise ValueError("用户不存在")     
         user_refresh_tokens = self.auth_repo.get_all_active_refresh_tokens()
 
         token_found_and_matched = False
